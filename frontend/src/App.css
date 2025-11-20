@@ -1,0 +1,271 @@
+/* Universal Styling */
+* {
+  font-family: "Courier New", Courier, monospace !important;
+  color: #ccc;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #000;
+}
+
+/* App Container */
+.app-container {
+  height: 100vh;
+  background-color: #000;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header {
+  background-color: #111;
+  padding: 15px;
+  font-size: 22px;
+  font-weight: bold;
+  border-bottom: 2px solid #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  text-shadow: 0 0 3px #ccc;
+}
+
+/* Info Button */
+.info-btn {
+  position: absolute;
+  right: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  color: #ccc;
+  text-shadow: 0 0 2px #ccc;
+}
+
+/* Main Layout */
+.terminal-body {
+  display: flex;
+  flex: 1;
+  padding: 20px;
+  gap: 20px;
+}
+
+/* Terminal Panels */
+.terminal-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid #ccc;
+  padding: 15px;
+  background-color: #111;
+  box-shadow: 0 0 5px #ccc;
+  height: 80vh;
+}
+
+.panel-title {
+  text-align: center;
+  margin-bottom: 12px;
+  font-size: 18px;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+  text-shadow: 0 0 2px #ccc;
+}
+
+/* Textarea */
+.terminal-textarea {
+  flex: 1;
+  background-color: #111;
+  border: 1px solid #ccc;
+  padding: 10px;
+  font-size: 18px;
+  resize: none;
+  overflow-y: scroll;
+  color: #ffffff;
+  max-height: 100vh;
+}
+
+/* Button */
+.terminal-btn {
+  margin-top: 12px;
+  padding: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  background-color: #111;
+  border: 2px solid #ccc;
+  cursor: pointer;
+  transition: 0.2s;
+  color: #ccc;
+  text-shadow: 0 0 2px #ccc;
+}
+
+.terminal-btn:hover {
+  background-color: #222;
+  box-shadow: 0 0 8px #ccc;
+}
+
+.terminal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Output */
+.terminal-output {
+  flex: 1;
+  background-color: #111;
+  border: 1px solid #ccc;
+  padding: 10px;
+  overflow-y: scroll;
+  font-size: 18px;
+  flex-wrap: wrap;
+  word-break: break-word;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  color: #ffffff;
+  max-height: 100vh;
+}
+
+/* Mobile Layout */
+@media (max-width: 800px) {
+  .terminal-body {
+    flex-direction: column;
+  }
+
+  .terminal-panel {
+    height: 50vh;
+  }
+
+  .terminal-textarea {
+    height: 60%;
+  }
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Modal Box */
+.modal {
+  background-color: #111;
+  border: 2px solid #ccc;
+  padding: 20px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 0 10px #ccc;
+}
+
+.modal h2 {
+  margin-top: 0;
+  text-align: center;
+  text-shadow: 0 0 3px #ccc;
+}
+
+.modal-close {
+  margin-top: 20px;
+  padding: 10px;
+  width: 100%;
+  background-color: #111;
+  border: 2px solid #ccc;
+  cursor: pointer;
+  font-size: 16px;
+  color: #ccc;
+  text-shadow: 0 0 2px #ccc;
+}
+
+.modal-close:hover {
+  background-color: #222;
+  box-shadow: 0 0 8px #ccc;
+}
+
+/* Loading Modal */
+.loading-modal {
+  background-color: #111;
+  border: 2px solid #ccc;
+  padding: 30px;
+  width: 90%;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 0 10px #ccc;
+}
+
+.loading-bar-outline {
+  width: 100%;
+  height: 20px;
+  border: 2px solid #ccc;
+  margin-top: 15px;
+  margin-bottom: 10px;
+  background-color: #222;
+  position: relative;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  background-color: #ccc;
+  width: 0%;
+  transition: width 0.12s linear;
+}
+
+/* JSON syntax highlighting */
+.json-key {
+  color: #00ffff;
+  text-shadow: 0 0 2px #00ffff;
+}
+
+.json-string {
+  color: #ffff00;
+  text-shadow: 0 0 2px #ffff00;
+}
+
+.json-number {
+  color: #ff00ff;
+  text-shadow: 0 0 2px #ff00ff;
+}
+
+.json-boolean {
+  color: #00ff00;
+  text-shadow: 0 0 2px #00ff00;
+}
+
+.json-null {
+  color: #888888;
+  text-shadow: 0 0 1px #888888;
+}
+
+.terminal-textarea,
+.terminal-output {
+  overflow: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc #111;
+}
+
+.terminal-textarea::-webkit-scrollbar,
+.terminal-output::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.terminal-textarea::-webkit-scrollbar-track,
+.terminal-output::-webkit-scrollbar-track {
+  background: #111;
+}
+
+.terminal-textarea::-webkit-scrollbar-thumb,
+.terminal-output::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 0;
+  border: none;
+}
+
+.terminal-textarea::-webkit-scrollbar-thumb:hover,
+.terminal-output::-webkit-scrollbar-thumb:hover {
+  background-color: #fff;
+}
