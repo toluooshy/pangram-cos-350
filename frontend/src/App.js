@@ -10,31 +10,43 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  // replaces CAS login
+  const [netidInput, setNetidInput] = useState("");
   const [userEmail, setUserEmail] = useState(null);
+
   const [usageCount, setUsageCount] = useState(0);
 
   const API_KEY = process.env.REACT_APP_PANGRAM_API_KEY;
   const FIRESTORE_COLLECTION =
     process.env.REACT_APP_FIREBASE_FIRESTORE_COLLECTION;
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+  const MAX_WORDS = process.env.REACT_APP_MAX_WORDS;
+  const MAX_USAGE = process.env.REACT_APP_MAX_USAGE;
 
-  // CAS login
-  const handleCASLogin = () => {
-    window.location.href = `${API_BASE_URL}/api/login`;
-  };
+  // Login (local only)
+  const handleLocalLogin = () => {
+    const trimmedNetid = netidInput.trim();
+    if (!trimmedNetid) return alert("Please enter a valid NetID.");
 
-  // CAS logout
-  const handleCASLogout = async () => {
-    try {
-      await fetch(`${API_BASE_URL}/api/logout`);
-      setUserEmail(null);
-      setUsageCount(0);
-    } catch (err) {
-      console.error("Logout failed", err);
+    // Get the whitelist from .env and split into array
+    const whitelist = (process.env.REACT_APP_LOGIN_IDS || "").split(",");
+
+    if (!whitelist.includes(trimmedNetid)) {
+      return alert("This NetID is not allowed.");
     }
+
+    const email = `${trimmedNetid}@princeton.edu`;
+    localStorage.setItem("pangram_netid", email);
+    setUserEmail(email);
   };
 
-  // Fetch usage count from Firestore
+  const handleLocalLogout = () => {
+    localStorage.removeItem("pangram_netid");
+    setUserEmail(null);
+    setUsageCount(0);
+  };
+
+  // Firestore usage count
   const fetchUsageCount = async (email) => {
     if (!email) return;
     const docRef = doc(db, FIRESTORE_COLLECTION, email);
@@ -42,14 +54,13 @@ export default function App() {
     setUsageCount(docSnap.exists() ? docSnap.data()?.count || 0 : 0);
   };
 
-  // Increment usage count in Firestore
   const incrementUsage = async (email) => {
     if (!email) return false;
     const docRef = doc(db, FIRESTORE_COLLECTION, email);
     const docSnap = await getDoc(docRef);
-    let currentCount = docSnap.exists() ? docSnap.data()?.count || 0 : 0;
+    const currentCount = docSnap.exists() ? docSnap.data()?.count || 0 : 0;
 
-    if (currentCount >= 5) {
+    if (currentCount >= MAX_USAGE) {
       alert("You have reached the maximum number of allowed tries.");
       return false;
     }
@@ -61,9 +72,9 @@ export default function App() {
 
   // Send button handler
   const handleSend = async () => {
-    if (!userEmail) return; // Prevent sending if not signed in
+    if (!userEmail) return;
 
-    if (usageCount >= 5) {
+    if (usageCount >= MAX_USAGE) {
       alert("You have reached the maximum number of allowed tries.");
       return;
     }
@@ -72,6 +83,7 @@ export default function App() {
     setResponse(null);
     setProgress(0);
 
+    // fake loading bar
     const interval = setInterval(() => {
       setProgress((p) => {
         if (p >= 100) {
@@ -95,7 +107,6 @@ export default function App() {
       const data = await res.json();
       setResponse(data);
 
-      // Increment usage count
       await incrementUsage(userEmail);
     } catch (err) {
       setResponse({ error: err.message });
@@ -106,41 +117,34 @@ export default function App() {
     setTimeout(() => setLoading(false), 400);
   };
 
-  // On mount, fetch user info
+  // Load stored login on mount
   useEffect(() => {
-    async function fetchUser() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/me`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setUserEmail(data.email);
-        await fetchUsageCount(data.email);
-      } catch (err) {
-        console.log("User not logged in");
-      }
+    const stored = localStorage.getItem("pangram_netid");
+    if (stored) {
+      setUserEmail(stored);
+      fetchUsageCount(stored);
     }
-    fetchUser();
   }, []);
 
   return (
     <div className="app-container">
       <header className="header">
         <span>Pangram COS 350 Terminal</span>
-        {userEmail && (
-          <>
-            <span style={{ marginLeft: "20px" }}>Usage: {usageCount}/5</span>
-            <button
-              className="info-btn"
-              style={{ marginLeft: "10px" }}
-              onClick={handleCASLogout}
-            >
-              Sign Out
-            </button>
-          </>
-        )}
-        <button className="info-btn" onClick={() => setShowModal(true)}>
-          ?
-        </button>
+        <div style={{ display: "flex", alignContent: "center" }}>
+          {userEmail && (
+            <div style={{ display: "flex" }}>
+              <div style={{ fontWeight: 400 }}>
+                [Usage: {usageCount}/{MAX_USAGE}]
+              </div>
+              <button className="terminal-btn2" onClick={handleLocalLogout}>
+                Sign Out
+              </button>
+            </div>
+          )}
+          <button className="info-btn" onClick={() => setShowModal(true)}>
+            ⓘ
+          </button>
+        </div>
       </header>
 
       {/* About modal */}
@@ -184,14 +188,23 @@ export default function App() {
         </div>
       )}
 
-      {/* Sign-in overlay if not signed in */}
+      {/* Sign-in overlay */}
       {!userEmail && (
         <div className="modal-overlay">
           <div className="loading-modal">
-            <h3>Please Sign In</h3>
-            <p>You must sign in with your Princeton account to use this app.</p>
-            <button className="terminal-btn" onClick={handleCASLogin}>
-              Sign In with CAS
+            <h3>Enter NetID</h3>
+            <p>You must sign in with your Princeton NetID to use this app.</p>
+
+            <input
+              className="terminal-textarea"
+              style={{ width: "80%", marginBottom: "10px" }}
+              placeholder="NetID (e.g., az1234)"
+              value={netidInput}
+              onChange={(e) => setNetidInput(e.target.value)}
+            />
+
+            <button className="terminal-btn" onClick={handleLocalLogin}>
+              Sign In
             </button>
           </div>
         </div>
@@ -204,10 +217,41 @@ export default function App() {
           <textarea
             className="terminal-textarea"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              const rawWords = e.target.value.split(/\s+/); // keep empty strings
+              const words = rawWords.slice(0, MAX_WORDS); // enforce max
+              setText(words.join(" "));
+            }}
+            onPaste={(e) => {
+              e.preventDefault();
+              const paste = (e.clipboardData || window.clipboardData).getData(
+                "text"
+              );
+              const pasteWords = paste.split(/\s+/); // keep spaces
+              const currentWords = text.split(/\s+/);
+              const remaining = MAX_WORDS - currentWords.length;
+              if (remaining <= 0) return;
+              const allowedWords = pasteWords.slice(0, remaining);
+              setText([...currentWords, ...allowedWords].join(" "));
+            }}
             placeholder="Enter text..."
             disabled={!userEmail}
           />
+
+          {/* Word counter */}
+          <div
+            style={{
+              textAlign: "right",
+              fontWeight: "bold",
+              color:
+                text.split(/\s+/).filter(Boolean).length >= MAX_WORDS - 1
+                  ? "#ff0000"
+                  : "#ffffff",
+              marginTop: "4px",
+            }}
+          >
+            {text.split(/\s+/).filter(Boolean).length} / {MAX_WORDS - 1} words
+          </div>
           <button
             className="terminal-btn"
             onClick={handleSend}
