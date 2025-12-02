@@ -1,49 +1,61 @@
 import React, { useState, useEffect } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, getDocs, collection } from "firebase/firestore";
 import { db } from "./utils/firebase";
+import { loginRequest } from "./utils/auth";
 import JSONColorOutput from "./JSONColorOutput";
+import { useMsal } from "@azure/msal-react";
 import "./App.css";
 
 export default function App() {
+  const { instance } = useMsal();
+
   const [text, setText] = useState("");
   const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [progress, setProgress] = useState(0);
-
-  // replaces CAS login
-  const [netidInput, setNetidInput] = useState("");
   const [userEmail, setUserEmail] = useState(null);
-
   const [usageCount, setUsageCount] = useState(0);
 
   const API_KEY = process.env.REACT_APP_PANGRAM_API_KEY;
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
   const FIRESTORE_COLLECTION =
     process.env.REACT_APP_FIREBASE_FIRESTORE_COLLECTION;
   const MAX_WORDS = process.env.REACT_APP_MAX_WORDS;
   const MAX_USAGE = process.env.REACT_APP_MAX_USAGE;
+  const LOGIN_IDS = (process.env.REACT_APP_LOGIN_IDS || "").split(",");
+  const ALERT_EMAILS = (process.env.REACT_APP_ALERT_EMAILS || "").split(",");
+  const ALERT_THRESHOLD = Number(process.env.REACT_APP_ALERT_THRESHOLD || 1000);
+  const ALERT_STEP = Number(process.env.REACT_APP_ALERT_STEP || 100);
 
-  // Login (local only)
-  const handleLocalLogin = () => {
-    const trimmedNetid = netidInput.trim();
-    if (!trimmedNetid) return alert("Please enter a valid NetID.");
+  // MSAL-powered Login
+  const handleLogin = () => {
+    instance
+      .loginPopup(loginRequest)
+      .then((response) => {
+        // Get the whitelist from .env and split into array
+        const whitelist = LOGIN_IDS;
+        const email = response.account.username;
+        const trimmedNetid = email.split("@")[0];
 
-    // Get the whitelist from .env and split into array
-    const whitelist = (process.env.REACT_APP_LOGIN_IDS || "").split(",");
-
-    if (!whitelist.includes(trimmedNetid)) {
-      return alert("This NetID is not allowed.");
-    }
-
-    const email = `${trimmedNetid}@princeton.edu`;
-    localStorage.setItem("pangram_netid", email);
-    setUserEmail(email);
+        if (!whitelist.includes(trimmedNetid)) {
+          return alert("This NetID is not allowed.");
+        }
+        localStorage.setItem("pangram_email", email);
+        setUserEmail(email);
+        fetchUsageCount(email);
+      })
+      .catch((error) => {
+        console.error("Login error:", error);
+      });
   };
 
-  const handleLocalLogout = () => {
-    localStorage.removeItem("pangram_netid");
+  // Logout
+  const handleLogout = () => {
+    localStorage.removeItem("pangram_email");
     setUserEmail(null);
     setUsageCount(0);
+    window.location.reload();
   };
 
   // Firestore usage count
@@ -54,19 +66,56 @@ export default function App() {
     setUsageCount(docSnap.exists() ? docSnap.data()?.count || 0 : 0);
   };
 
+  // Cumulative firestore usage count
+  const getTotalUsage = async () => {
+    const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION));
+    let total = 0;
+    querySnapshot.forEach((doc) => {
+      const count = doc.data()?.count || 0;
+      total += count;
+    });
+    return total;
+  };
+
   const incrementUsage = async (email) => {
     if (!email) return false;
-    const docRef = doc(db, FIRESTORE_COLLECTION, email);
-    const docSnap = await getDoc(docRef);
-    const currentCount = docSnap.exists() ? docSnap.data()?.count || 0 : 0;
 
-    if (currentCount >= MAX_USAGE) {
+    const userRef = doc(db, FIRESTORE_COLLECTION, email);
+    const userSnap = await getDoc(userRef);
+    const currentUserCount = userSnap.exists()
+      ? userSnap.data()?.count || 0
+      : 0;
+
+    if (currentUserCount >= MAX_USAGE) {
       alert("You have reached the maximum number of allowed tries.");
       return false;
     }
 
-    await setDoc(docRef, { count: currentCount + 1 }, { merge: true });
-    setUsageCount(currentCount + 1);
+    // Increment user count
+    await setDoc(userRef, { count: currentUserCount + 1 }, { merge: true });
+    setUsageCount(currentUserCount + 1);
+
+    // Get total usage across all users
+    const totalUsage = await getTotalUsage();
+
+    // Send alert if over threshold
+    if (
+      totalUsage >= ALERT_THRESHOLD &&
+      (totalUsage - ALERT_THRESHOLD) % ALERT_STEP === 0
+    ) {
+      ALERT_EMAILS.forEach(async (email) => {
+        await fetch(`${API_BASE_URL}/api/send-alert`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: [email],
+            subject: `⚠️ Princeton COS 350 Pangram Terminal Usage: ${totalUsage}`,
+            message: `Alert! Total Pangram Terminal AI interface usage across all students for the assignment has reached ${totalUsage} uses.`,
+          }),
+        });
+      });
+    }
+
     return true;
   };
 
@@ -83,7 +132,7 @@ export default function App() {
     setResponse(null);
     setProgress(0);
 
-    // fake loading bar
+    // Loading bar
     const interval = setInterval(() => {
       setProgress((p) => {
         if (p >= 100) {
@@ -119,7 +168,7 @@ export default function App() {
 
   // Load stored login on mount
   useEffect(() => {
-    const stored = localStorage.getItem("pangram_netid");
+    const stored = localStorage.getItem("pangram_email");
     if (stored) {
       setUserEmail(stored);
       fetchUsageCount(stored);
@@ -136,7 +185,7 @@ export default function App() {
               <div style={{ fontWeight: 400 }}>
                 [Usage: {usageCount}/{MAX_USAGE}]
               </div>
-              <button className="terminal-btn2" onClick={handleLocalLogout}>
+              <button className="terminal-btn2" onClick={handleLogout}>
                 Sign Out
               </button>
             </div>
@@ -188,23 +237,17 @@ export default function App() {
         </div>
       )}
 
-      {/* Sign-in overlay */}
+      {/* Login overlay */}
       {!userEmail && (
         <div className="modal-overlay">
           <div className="loading-modal">
-            <h3>Enter NetID</h3>
-            <p>You must sign in with your Princeton NetID to use this app.</p>
+            <h3>Sign In</h3>
+            <p>
+              You must sign in with your institutional account to use this app.
+            </p>
 
-            <input
-              className="terminal-textarea"
-              style={{ width: "80%", marginBottom: "10px" }}
-              placeholder="NetID (e.g., az1234)"
-              value={netidInput}
-              onChange={(e) => setNetidInput(e.target.value)}
-            />
-
-            <button className="terminal-btn" onClick={handleLocalLogin}>
-              Sign In
+            <button className="terminal-btn" onClick={handleLogin}>
+              Sign In with Entra ID
             </button>
           </div>
         </div>

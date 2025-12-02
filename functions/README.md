@@ -2,10 +2,8 @@
 
 This folder contains the **backend server** for the Pangram COS 350 assignment tool. It uses **Firebase Cloud Functions** and **Express** to provide API endpoints for:
 
-- CAS authentication
-- User session management
-- Usage tracking (via Firestore)
-- Proxying requests to the Pangram AI detection API
+- Sending email alerts via Nodemailer
+- CORS-enabled API access for frontend or other services
 
 ---
 
@@ -34,24 +32,66 @@ This folder contains the **backend server** for the Pangram COS 350 assignment t
 Create a `.env` file in the `functions/` folder. Required variables:
 
 ```env
-# CAS configuration
-CAS_URL=https://fed.princeton.edu/cas/
-
-# Name of the Firestore collection used for tracking usage
-FIRESTORE_COLLECTION=usage
-
-# Secret key for session encryption
-SESSION_SECRET=your-session-secret
-SESSION_NAME=session
-
-# Frontend URL for redirects after login/logout
-CLIENT_URL=http://localhost:3000
-
-# Pangram usage limit per user
-MAX_USAGE=5
+# Email settings for Nodemailer
+EMAIL_SERVICE=gmail
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS="your app password"
 ```
 
-> ⚠️ All variables are loaded using `dotenv`. Keep this file out of version control.
+> ⚠️ All variables are loaded using `dotenv`. Keep this file secret! Do **not** commit it to version control. Use `.gitignore`.
+
+---
+
+### **How to Generate an App Password**
+
+Some email providers (Gmail, Outlook, Yahoo) require an **App Password** to allow third-party apps to send email via SMTP.
+
+---
+
+### ✅ **1. Gmail**
+
+1. Go to [Google Account Security](https://myaccount.google.com/security)
+2. Enable **2-Step Verification** if not already on.
+3. Under **Signing in to Google**, click **App Passwords**.
+4. Select:
+
+   - App: Mail
+   - Device: Other → name it (e.g., “Node.js Server”)
+
+5. Google generates a **16-character app password**.
+6. Use this **exact string** (without spaces) as `EMAIL_PASS` in your `.env`.
+
+**Tip:** If you copy it with spaces (like `"abcd efgh ijkl mnop"`), remove the spaces so it becomes `"abcdefghijklmnop"`.
+
+---
+
+### ✅ **2. Outlook / Hotmail**
+
+1. Sign in at [Microsoft Account Security](https://account.microsoft.com/security).
+2. Enable **Two-Step Verification**.
+3. Go to **Advanced Security Options → App passwords → Create a new app password**.
+4. Copy the password and use it as `EMAIL_PASS` in `.env`.
+
+---
+
+### ✅ **3. Yahoo Mail**
+
+1. Go to [Yahoo Account Security](https://login.yahoo.com/account/security).
+2. Enable **Two-step verification**.
+3. Click **Generate app password** → select **Other App** → name it (e.g., “Node.js Server”).
+4. Copy the generated password and use it as `EMAIL_PASS` in `.env`.
+
+---
+
+### **Example `.env`**
+
+```env
+EMAIL_SERVICE=gmail
+EMAIL_USER=myemail@gmail.com
+EMAIL_PASS=abcdefghijklmnop
+```
+
+> Make sure you remove any quotation marks or spaces from the app password.
 
 ---
 
@@ -72,7 +112,7 @@ firebase emulators:start --only functions
 
 - Your backend will run at:
   `http://localhost:5001/<project-id>/us-central1/app`
-- Example: `http://localhost:5001/pangram-tolu/us-central1/app/api/me`
+- Example: `http://localhost:5001/pangram-tolu/us-central1/app/api/send-alert`
 
 3. The frontend can use this local URL as the API base (`REACT_APP_API_BASE_URL`) for development.
 
@@ -108,19 +148,35 @@ functions/
 
 ## **API Endpoints**
 
-| Endpoint               | Method | Description                                         |
-| ---------------------- | ------ | --------------------------------------------------- |
-| `/api/login`           | GET    | Initiates CAS login or validates CAS ticket         |
-| `/api/logout`          | GET    | Logs the user out and redirects to CAS logout       |
-| `/api/me`              | GET    | Returns the currently signed-in user's email        |
-| `/api/usage`           | GET    | Returns current user's usage count from Firestore   |
-| `/api/usage/increment` | POST   | Increments usage count (fails if max usage reached) |
+| Endpoint          | Method | Description                           |
+| ----------------- | ------ | ------------------------------------- |
+| `/api/send-alert` | POST   | Sends an email alert using Nodemailer |
+
+**Request body (JSON):**
+
+```json
+{
+  "to": ["recipient1@example.com", "recipient2@example.com"],
+  "subject": "Alert Subject",
+  "message": "Alert message body"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Alert sent to recipient1@example.com, recipient2@example.com"
+}
+```
+
+> Returns `400` if required fields are missing and `500` if sending the email fails.
 
 ---
 
 ### **Notes**
 
-- **Sessions:** Stored in encrypted cookies using `cookie-session`.
-- **Usage Tracking:** Firestore is used to track how many times each user has accessed the AI API.
-- **CAS Authentication:** Princeton CAS login is used for all user verification.
-- **Proxying Pangram API:** The backend is responsible for calling the Pangram API using the API key stored in `.env`.
+- **CORS Enabled:** The backend allows requests from any origin.
+- **Email Alerts:** Uses Gmail (or any SMTP-compatible service) via Nodemailer.
+- **Security:** Keep `.env` secret; never commit your email credentials to version control.

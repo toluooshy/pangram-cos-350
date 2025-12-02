@@ -1,6 +1,25 @@
 # Pangram COS 350 Terminal 🖥️🤖
 
-A full-stack web tool for **COS 350 Assignment A4** that allows students to generate AI text, test it with the **Pangram AI detector**, and practice editing it to reduce AI-detection likelihood. The project combines a **React frontend** with a **Firebase Cloud Functions backend** that handles CAS authentication, session management, and usage tracking.
+A full-stack web tool for **COS 350 Assignment A4** that allows students to generate AI text, test it with the **Pangram AI detector**, and practice editing it to reduce AI-detection likelihood.
+
+The project combines:
+
+- **React frontend**: Handles MSAL login, text submission, UI, usage tracking, and threshold-based email alerts.
+- **Firebase Functions backend**: Sends **email alerts** via Nodemailer.
+
+---
+
+## Example Analysis Screenshots
+
+|                       **Spider-Man Wikipedia page**                       |              **Terminal analysis of Spider-Man text**               |
+| :-----------------------------------------------------------------------: | :-----------------------------------------------------------------: |
+| ![Spiderman Wikipedia](readme_images/spider-man_wikipedia_screenshot.png) | ![Terminal Analysis](readme_images/spider-man_pangram_analysis.png) |
+
+|                    **ChatGPT Superman output**                     |          **Terminal analysis of Superman text**          |
+| :----------------------------------------------------------------: | :------------------------------------------------------: |
+| ![ChatGPT Superman](readme_images/superman_chatgpt_screenshot.png) | ![Analysis](readme_images/superman_pangram_analysis.png) |
+
+_Caption: Top row shows Spider-Man content and its AI detection; bottom row shows ChatGPT Superman content and its AI detection._
 
 ---
 
@@ -14,6 +33,7 @@ A full-stack web tool for **COS 350 Assignment A4** that allows students to gene
 - [Local Development](#local-development)
 - [Deployment](#deployment)
 - [Project Structure](#project-structure)
+- [Usage](#usage)
 - [API Reference](#api-reference)
 - [Notes](#notes)
 
@@ -21,22 +41,25 @@ A full-stack web tool for **COS 350 Assignment A4** that allows students to gene
 
 ## **Overview**
 
-The Pangram COS 350 Terminal lets students interact with AI-generated text in a controlled environment:
+The Pangram COS 350 Terminal allows students to:
 
-- Students submit text and get a **Pangram AI detection score**.
-- The tool enforces **usage limits per student** (via Firestore).
-- Authentication is handled securely via **Princeton CAS**.
-- All API requests to Pangram are proxied through the backend to **share a single API subscription**.
+- Submit text and receive a **Pangram AI detection score** (via the frontend directly calling the Pangram API).
+- Track **per-user usage** in Firestore.
+- Authenticate via **Microsoft/Entra ID (MSAL)** with a whitelist of allowed users.
+- Trigger **email alerts** when cumulative usage exceeds thresholds.
+
+The backend only **sends email alerts** via SMTP.
 
 ---
 
 ## **Features**
 
-- **CAS Login/Logout**: Authenticate Princeton users securely.
-- **Usage Tracking**: Each user has a max of 5 API calls (configurable).
-- **Input/Output Panels**: React UI for submitting text and viewing JSON responses.
-- **Loading and Status Indicators**: Shows progress while waiting for API responses.
-- **Modal Info Panel**: Instructions and background info for students.
+- **MSAL Login/Logout**: Microsoft authentication with whitelist enforcement.
+- **Pangram AI Submission**: Frontend calls Pangram API using a shared API key.
+- **Usage Tracking**: Firestore tracks per-user usage; frontend enforces max usage.
+- **Email Alerts**: Backend sends notifications when total usage passes thresholds.
+- **Input/Output Panels**: Color-coded JSON output for easy inspection.
+- **Help Modal**: Instructions and information about Pangram.
 
 ---
 
@@ -45,61 +68,91 @@ The Pangram COS 350 Terminal lets students interact with AI-generated text in a 
 ```
 Frontend (React)
 │
-├─ /src
-│   ├─ App.js           # Main React component
-│   ├─ JSONColorOutput.js # Renders API responses in color
-│   └─ utils/firebase.js # Firebase initialization
-│
-├─ package.json
-└─ .env                 # API base URL & keys
+├─ public/
+├─ src/
+│   ├─ App.js               # Main component
+│   ├─ JSONColorOutput.js   # Renders AI detection results
+│   ├─ utils/firebase.js    # Firestore setup
+│   └─ index.js             # App entry point with MsalProvider
+├─ .env                     # Frontend environment variables
+└─ package.json
 
 Backend (Firebase Functions / Express)
 │
-├─ index.js             # Express app with CAS and usage routes
+├─ index.js                 # Handles /api/send-alert
+├─ .env                     # Email credentials
 ├─ package.json
-├─ .env                 # CAS, Firestore, session, API configs
 └─ node_modules/
 ```
 
-- **Frontend** communicates with backend via `REACT_APP_API_BASE_URL`.
-- **Backend** handles CAS authentication, Firestore usage, and API proxying.
-- **Firebase Emulators** can run both frontend and backend locally for testing.
+- **Frontend** handles login, API calls, usage tracking, and alert logic.
+- **Backend** only provides `/api/send-alert` endpoint.
 
 ---
 
 ## **Prerequisites**
 
-- Node.js >= 18 (recommended 18–24)
+- Node.js >= 18
 - npm >= 9
 - Firebase CLI (`npm install -g firebase-tools`)
-- Firebase project initialized for Functions and Firestore
-- Access to Pangram API key
+- **Firebase project** with:
+
+  - **Functions** (for `/api/send-alert`)
+  - **Firestore** (for per-user usage tracking)
+  - **Hosting** (for frontend deployment)
+
+- Pangram API key
+- Microsoft/Entra ID app for MSAL login
+- SMTP credentials (for backend email alerts)
 
 ---
 
 ## **Environment Variables**
 
-### Frontend (`.env` in `frontend/`)
+### Frontend (`frontend/.env`)
 
 ```env
-# Base URL for backend API
+# Backend API
 REACT_APP_API_BASE_URL=http://localhost:5001/<project-id>/us-central1/app
+
+# Pangram API key
 REACT_APP_PANGRAM_API_KEY=your-pangram-api-key
+
+# Input limits
+REACT_APP_MAX_WORDS=1001
+REACT_APP_MAX_USAGE=40
+
+# MSAL login whitelist
+REACT_APP_LOGIN_IDS="az1234,xy6741,rk1738"
+
+# Email alert recipients and thresholds
+REACT_APP_ALERT_EMAILS="az1234@princeton.edu,xy6741@princeton.edu,rk1738@cs.princeton.edu"
+REACT_APP_ALERT_THRESHOLD=1000
+REACT_APP_ALERT_STEP=100
+
+# Firebase Firestore
+REACT_APP_FIREBASE_API_KEY=your_firebase_api_key
+REACT_APP_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+REACT_APP_FIREBASE_PROJECT_ID=your_project_id
+REACT_APP_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
+REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+REACT_APP_FIREBASE_APP_ID=your_app_id
+REACT_APP_FIREBASE_MEASUREMENT_ID=your_measurement_id
 REACT_APP_FIREBASE_FIRESTORE_COLLECTION=usage
+
+# MSAL Configuration
+REACT_APP_AZURE_CLIENT_ID=your_azure_app_client_id
+REACT_APP_AZURE_TENANT_ID=your_tenant_id_or_common
+REACT_APP_AZURE_REDIRECT_URI=http://localhost:3000/
 ```
 
-### Backend (`.env` in `functions/`)
+### Backend (`functions/.env`)
 
 ```env
-CAS_URL=https://fed.princeton.edu/cas/
-FIRESTORE_COLLECTION=usage
-SESSION_SECRET=your-session-secret
-SESSION_NAME=session
-CLIENT_URL=http://localhost:3000
-MAX_USAGE=5
+EMAIL_SERVICE=gmail
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
 ```
-
-> ⚠️ Keep all `.env` files out of version control.
 
 ---
 
@@ -113,8 +166,7 @@ npm install
 firebase emulators:start --only functions
 ```
 
-- Functions will run at:
-  `http://localhost:5001/<project-id>/us-central1/app`
+- Backend runs at `http://localhost:5001/<project-id>/us-central1/app`
 
 ### Frontend
 
@@ -124,8 +176,8 @@ npm install
 npm start
 ```
 
-- Frontend runs at: `http://localhost:3000`
-- Make sure `REACT_APP_API_BASE_URL` points to your local backend.
+- Frontend runs at `http://localhost:3000`
+- Ensure `REACT_APP_API_BASE_URL` points to your local backend.
 
 ---
 
@@ -139,43 +191,79 @@ npm install
 firebase deploy --only functions
 ```
 
-- Backend functions will be live at:
-  `https://us-central1-<project-id>.cloudfunctions.net/app`
+- Live endpoint: `https://us-central1-<project-id>.cloudfunctions.net/app`
 
 ### Frontend
-
-1. Build production version:
 
 ```bash
 cd frontend
 npm run build
-```
-
-2. Deploy to Firebase Hosting (or any static host):
-
-```bash
 firebase deploy --only hosting
 ```
 
-- Frontend will then communicate with deployed backend via production API URL.
+---
+
+## **Usage**
+
+1. **Sign in** via Microsoft login. Only whitelisted users can access.
+2. **Input text** (max words enforced).
+3. **Submit** to Pangram API via frontend.
+4. **View output** in color-coded JSON panel.
+5. **Track usage** automatically in Firestore.
+6. **Email alerts** sent when thresholds exceeded via backend `/api/send-alert`.
+7. **Help modal** provides instructions and background info.
 
 ---
 
-## **API Reference (Backend)**
+## **API Reference**
 
-| Endpoint               | Method | Description                                         |
-| ---------------------- | ------ | --------------------------------------------------- |
-| `/api/login`           | GET    | Initiates CAS login or validates CAS ticket         |
-| `/api/logout`          | GET    | Logs user out and redirects to CAS logout           |
-| `/api/me`              | GET    | Returns signed-in user email                        |
-| `/api/usage`           | GET    | Returns user’s current API usage count              |
-| `/api/usage/increment` | POST   | Increments usage count (fails if max usage reached) |
+| Endpoint          | Method | Description                        |
+| ----------------- | ------ | ---------------------------------- |
+| `/api/send-alert` | POST   | Sends email alert using Nodemailer |
+
+**Request body (JSON)**
+
+```json
+{
+  "to": ["recipient1@example.com", "recipient2@example.com"],
+  "subject": "Alert Subject",
+  "message": "Alert message body"
+}
+```
+
+**Response**
+
+```json
+{
+  "success": true,
+  "message": "Alert sent to recipient1@example.com, recipient2@example.com"
+}
+```
+
+---
+
+## **Project Structure**
+
+```
+root/
+│
+├─ frontend/
+│   ├─ public/
+│   ├─ src/
+│   ├─ .env
+│   └─ package.json
+│
+├─ functions/
+│   ├─ index.js
+│   ├─ .env
+│   └─ package.json
+```
 
 ---
 
 ## **Notes**
 
-- **Sessions**: Managed via cookie-session, encrypted, 12-hour lifetime.
-- **Usage Limits**: Enforced both client-side and server-side.
-- **CAS Authentication**: Princeton CAS handles secure sign-in.
-- **Pangram API**: Requests are proxied through backend to consolidate API quota.
+- Backend **only handles email alerts**; frontend handles login, Pangram API calls, and usage tracking.
+- MSAL login ensures only allowed users can use the app.
+- Firestore enforces usage limits server-side.
+- Keep all `.env` files secret. Never commit API keys, passwords, or email credentials.
